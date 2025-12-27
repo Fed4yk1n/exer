@@ -1,42 +1,25 @@
-# app.py - PhysioCheck: AI-Powered Physiotherapy Assistant
+# app.py — PhysioCheck (Streamlit Cloud compatible)
 
 import streamlit as st
 import cv2
 import mediapipe as mp
 import numpy as np
-import json
-import os
-from pathlib import Path
-from datetime import datetime
 import time
-import gc
 from collections import deque
-import base64
 from PIL import Image
-import io
 
 # ==================== PAGE CONFIG ====================
 st.set_page_config(
-    page_title="PhysioCheck - AI Physiotherapy",
+    page_title="PhysioCheck",
     page_icon="🏃‍♂️",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# ==================== CUSTOM CSS ====================
+# ==================== STYLES ====================
 st.markdown("""
 <style>
 .stApp { background: #0a0e27; }
-[data-testid="stSidebar"] { background: #111827; }
-h1, h2, h3 { color: #3b82f6 !important; font-weight: 600; }
-.exercise-card {
-    background: #1f2937; padding: 20px; border-radius: 12px;
-    border: 1px solid #374151; margin: 10px 0;
-}
-.stButton>button {
-    background: #3b82f6; color: white;
-    border-radius: 8px;
-}
+h1, h2, h3 { color: #3b82f6; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -44,24 +27,18 @@ h1, h2, h3 { color: #3b82f6 !important; font-weight: 600; }
 mp_pose = mp.solutions.pose
 mp_drawing = mp.solutions.drawing_utils
 
-# ==================== DIRECTORIES ====================
-DATA_DIR = Path("exercise_data")
-DATA_DIR.mkdir(exist_ok=True)
-STEPS_DIR = DATA_DIR / "steps"
-STEPS_DIR.mkdir(exist_ok=True)
-
 # ==================== ANALYZER ====================
-class StepBasedExerciseAnalyzer:
-    def __init__(self, model_complexity=1):
+class PoseAnalyzer:
+    def __init__(self):
         self.pose = mp_pose.Pose(
-            static_image_mode=False,
-            model_complexity=model_complexity,
+            static_image_mode=True,
+            model_complexity=1,
             smooth_landmarks=True,
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5
         )
         self.last_time = time.time()
-        self.fps_q = deque(maxlen=20)
+        self.fps_q = deque(maxlen=10)
 
     def get_fps(self):
         now = time.time()
@@ -73,106 +50,87 @@ class StepBasedExerciseAnalyzer:
     @staticmethod
     def angle(a, b, c):
         a, b, c = np.array(a), np.array(b), np.array(c)
-        radians = np.arctan2(c[1]-b[1], c[0]-b[0]) - \
-                  np.arctan2(a[1]-b[1], a[0]-b[0])
-        angle = abs(np.degrees(radians))
-        return 360 - angle if angle > 180 else angle
+        rad = np.arctan2(c[1]-b[1], c[0]-b[0]) - \
+              np.arctan2(a[1]-b[1], a[0]-b[0])
+        deg = abs(np.degrees(rad))
+        return 360 - deg if deg > 180 else deg
 
-    def extract_landmarks(self, frame):
-        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = self.pose.process(rgb)
-        if not results.pose_landmarks:
-            return None, None
-        landmarks = [[l.x, l.y, l.z, l.visibility]
-                     for l in results.pose_landmarks.landmark]
-        return np.array(landmarks), results.pose_landmarks
+    def process(self, frame_bgr):
+        rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+        res = self.pose.process(rgb)
 
-    def calculate_angles(self, lm):
-        return {
-            "left_elbow": self.angle(lm[11][:2], lm[13][:2], lm[15][:2]),
-            "right_elbow": self.angle(lm[12][:2], lm[14][:2], lm[16][:2]),
-        }
+        if not res.pose_landmarks:
+            return frame_bgr, None
+
+        lm = res.pose_landmarks.landmark
+
+        # Simple elbow angle example
+        left_elbow = self.angle(
+            [lm[11].x, lm[11].y],
+            [lm[13].x, lm[13].y],
+            [lm[15].x, lm[15].y],
+        )
+
+        mp_drawing.draw_landmarks(
+            frame_bgr,
+            res.pose_landmarks,
+            mp_pose.POSE_CONNECTIONS
+        )
+
+        return frame_bgr, left_elbow
 
 # ==================== REP COUNTER ====================
-class StepBasedRepCounter:
+class RepCounter:
     def __init__(self):
-        self.reps = 0
         self.state = 0
+        self.reps = 0
 
-    def update(self, angles):
-        if angles["left_elbow"] < 60:
+    def update(self, angle):
+        if angle is None:
+            return self.reps
+
+        if angle < 60:
             self.state = 1
-        if angles["left_elbow"] > 150 and self.state == 1:
+        elif angle > 150 and self.state == 1:
             self.reps += 1
             self.state = 0
+
         return self.reps
 
-# ==================== SESSION STATE ====================
-if "camera_running" not in st.session_state:
-    st.session_state.camera_running = False
-
-# ==================== SIDEBAR ====================
-with st.sidebar:
-    st.markdown("## 🏃 PhysioCheck")
-    st.markdown("AI Physiotherapy Assistant")
-    st.markdown("---")
-
-# ==================== MAIN ====================
+# ==================== APP ====================
 st.title("PhysioCheck")
-st.markdown("Live AI-based exercise analysis using MediaPipe Pose")
+st.markdown("AI Physiotherapy Assistant (Streamlit Cloud Demo)")
 
-start, stop = st.columns(2)
-with start:
-    if st.button("▶ Start Camera"):
-        st.session_state.camera_running = True
-with stop:
-    if st.button("⏹ Stop Camera"):
-        st.session_state.camera_running = False
+st.info(
+    "This demo uses **browser camera snapshots** (`st.camera_input`). "
+    "Live OpenCV webcam streams are not supported on Streamlit Cloud."
+)
 
-frame_box = st.empty()
-rep_box = st.metric("Reps", 0)
+analyzer = PoseAnalyzer()
+counter = RepCounter()
 
-# ==================== CAMERA LOOP ====================
-if st.session_state.camera_running:
-    cap = cv2.VideoCapture(0)
+frame_file = st.camera_input("📸 Capture frame")
 
-    if not cap.isOpened():
-        st.error("Cannot access camera")
-        st.session_state.camera_running = False
-    else:
-        analyzer = StepBasedExerciseAnalyzer()
-        counter = StepBasedRepCounter()
+if frame_file is not None:
+    image = Image.open(frame_file).convert("RGB")
+    frame = np.array(image)
+    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
-        while st.session_state.camera_running:
-            ret, frame = cap.read()
-            if not ret:
-                break
+    processed, elbow_angle = analyzer.process(frame)
+    reps = counter.update(elbow_angle)
 
-            frame = cv2.flip(frame, 1)
-            lm, pose = analyzer.extract_landmarks(frame)
-
-            if lm is not None:
-                angles = analyzer.calculate_angles(lm)
-                reps = counter.update(angles)
-                rep_box.metric("Reps", reps)
-
-                mp_drawing.draw_landmarks(
-                    frame, pose, mp_pose.POSE_CONNECTIONS
-                )
-
-                cv2.putText(
-                    frame, f"FPS: {analyzer.get_fps()}",
-                    (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
-                    0.8, (59, 130, 246), 2
-                )
-
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            frame_box.image(frame_rgb, channels="RGB", use_column_width=True)
-            time.sleep(0.01)
-
-        cap.release()
-        gc.collect()
+    col1, col2 = st.columns(2)
+    with col1:
+        st.image(
+            cv2.cvtColor(processed, cv2.COLOR_BGR2RGB),
+            channels="RGB",
+            use_column_width=True
+        )
+    with col2:
+        st.metric("Elbow Angle", f"{int(elbow_angle) if elbow_angle else '--'}°")
+        st.metric("Reps", reps)
+        st.metric("FPS", analyzer.get_fps())
 
 st.markdown("---")
-st.caption("PhysioCheck • Streamlit Community Cloud • Live Webcam Enabled")
+st.caption("PhysioCheck • Streamlit Community Cloud • Headless OpenCV")
 
