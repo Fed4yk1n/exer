@@ -680,25 +680,25 @@ class StepBasedRepCounter:
 
 # ==================== VIDEO PROCESSOR FOR WEBRTC ====================
 class VideoProcessor:
+    """Process video frames from browser camera in real-time"""
+
     def __init__(self, exercise_data, model_complexity=None):
         if model_complexity is None:
             model_complexity = 1
 
-    """Process video frames from browser camera in real-time"""
-    
-    def __init__(self, exercise_data, model_complexity=1):
         self.exercise_data = exercise_data
         self.analyzer = StepBasedExerciseAnalyzer(model_complexity=model_complexity)
         self.counter = StepBasedRepCounter(exercise_data['steps_data'])
         self.muscle_viz = MuscleVisualizer()
         self.active_muscles = self.muscle_viz.get_active_muscles(exercise_data)
         self.lock = threading.Lock()
-        
+
         # Current stats
         self.current_step = 0
         self.rep_count = 0
         self.step_accuracy = 0
         self.pose_detected = False
+
     
     def recv(self, frame):
         """Process each video frame from camera"""
@@ -774,19 +774,17 @@ with st.sidebar:
     st.metric("Exercises", total_exercises)
     
     st.markdown("---")
-    st.markdown("#### Settings")
-    
-   st.selectbox(
-    "Model Quality",
-    options=[0, 1, 2],
-    format_func=lambda x: ["Lite (Fast)", "Balanced", "Accurate (Slow)"][x],
-    index=1,
-    key="model_complexity"
-)
+        st.markdown("#### Settings")
 
-
+    st.selectbox(
+        "Model Quality",
+        options=[0, 1, 2],
+        format_func=lambda x: ["Lite (Fast)", "Balanced", "Accurate (Slow)"][x],
+        index=1,
+        key="model_complexity"
+    )
     
-)
+   
     st.session_state.show_skeleton = st.checkbox(
         "Show Skeleton", 
         value=st.session_state.show_skeleton
