@@ -776,16 +776,14 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("#### Settings")
     
-    st.session_state.model_complexity = st.selectbox(
-        "Model Quality",
-        options=[0, 1, 2],
-        format_func=lambda x: ["Lite (Fast)", "Balanced", "Accurate (Slow)"][x],
-        st.session_state.model_complexity = st.selectbox(
-        "Model Quality",
-        options=[0, 1, 2],
-        format_func=lambda x: ["Lite (Fast)", "Balanced", "Accurate (Slow)"][x],
-        index=1  # always safe default
+   st.selectbox(
+    "Model Quality",
+    options=[0, 1, 2],
+    format_func=lambda x: ["Lite (Fast)", "Balanced", "Accurate (Slow)"][x],
+    index=1,
+    key="model_complexity"
 )
+
 
     )
     
