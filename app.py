@@ -16,6 +16,7 @@ from PIL import Image
 import io
 import threading
 
+
 # WebRTC imports
 from streamlit_webrtc import webrtc_streamer, WebRtcMode, RTCConfiguration
 import av
@@ -679,6 +680,10 @@ class StepBasedRepCounter:
 
 # ==================== VIDEO PROCESSOR FOR WEBRTC ====================
 class VideoProcessor:
+    def __init__(self, exercise_data, model_complexity=None):
+        if model_complexity is None:
+            model_complexity = 1
+
     """Process video frames from browser camera in real-time"""
     
     def __init__(self, exercise_data, model_complexity=1):
@@ -756,25 +761,7 @@ class VideoProcessor:
         return av.VideoFrame.from_ndarray(img, format="bgr24")
 
 # ==================== SESSION STATE INITIALIZATION ====================
-def initialize_session_state():
-    if 'exercises' not in st.session_state:
-        st.session_state.exercises = {}
-        try:
-            for file in DATA_DIR.glob("*.json"):
-                with open(file, 'r') as f:
-                    st.session_state.exercises[file.stem] = json.load(f)
-        except Exception as e:
-            print(f"Error loading exercises: {e}")
-    if 'selected_exercise' not in st.session_state:
-        st.session_state.selected_exercise = None
-    if 'show_skeleton' not in st.session_state:
-        st.session_state.show_skeleton = True
-    if 'model_complexity' not in st.session_state:
-        st.session_state.model_complexity = 1
-    if 'num_steps' not in st.session_state:
-        st.session_state.num_steps = 2
 
-initialize_session_state()
 
 # ==================== SIDEBAR ====================
 with st.sidebar:
@@ -793,7 +780,13 @@ with st.sidebar:
         "Model Quality",
         options=[0, 1, 2],
         format_func=lambda x: ["Lite (Fast)", "Balanced", "Accurate (Slow)"][x],
-        index=st.session_state.model_complexity
+        st.session_state.model_complexity = st.selectbox(
+        "Model Quality",
+        options=[0, 1, 2],
+        format_func=lambda x: ["Lite (Fast)", "Balanced", "Accurate (Slow)"][x],
+        index=1  # always safe default
+)
+
     )
     
     st.session_state.show_skeleton = st.checkbox(
@@ -1083,7 +1076,7 @@ with tab1:
                     rtc_configuration=RTC_CONFIGURATION,
                     video_processor_factory=lambda: VideoProcessor(
                         exercise_data, 
-                        st.session_state.model_complexity
+                        st.session_state.get("model_complexity", 1)
                     ),
                     media_stream_constraints={
                         "video": {
