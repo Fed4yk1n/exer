@@ -785,7 +785,7 @@ with st.sidebar:
 )
 
 
-    )
+    
     
     st.session_state.show_skeleton = st.checkbox(
         "Show Skeleton", 
