@@ -1,9 +1,5 @@
-libgl1-mesa-glx
-libglib2.0-0
-libsm6
-libxrender1
-libxext6
 pkg-config
+ffmpeg
 libavformat-dev
 libavcodec-dev
 libavdevice-dev
@@ -11,4 +7,8 @@ libavutil-dev
 libswscale-dev
 libswresample-dev
 libavfilter-dev
-ffmpeg
+libgl1-mesa-glx
+libglib2.0-0
+libsm6
+libxrender1
+libxext6
