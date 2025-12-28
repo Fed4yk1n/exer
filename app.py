@@ -764,17 +764,18 @@ class VideoProcessor:
 
 
 # ==================== SIDEBAR ====================
+# ==================== SIDEBAR ====================
 with st.sidebar:
     st.markdown("### 🏃‍♂️ PhysioCheck")
     st.markdown("---")
     st.markdown("**AI-Powered Physiotherapy**")
     st.markdown("---")
-    
+
     total_exercises = len(st.session_state.exercises)
     st.metric("Exercises", total_exercises)
-    
+
     st.markdown("---")
-        st.markdown("#### Settings")
+    st.markdown("#### Settings")
 
     st.selectbox(
         "Model Quality",
@@ -783,12 +784,13 @@ with st.sidebar:
         index=1,
         key="model_complexity"
     )
-    
-   
-    st.session_state.show_skeleton = st.checkbox(
-        "Show Skeleton", 
-        value=st.session_state.show_skeleton
+
+    st.checkbox(
+        "Show Skeleton",
+        value=st.session_state.show_skeleton,
+        key="show_skeleton"
     )
+
 
 # ==================== MAIN APP ====================
 st.markdown("# PhysioCheck")
